@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDK特征工程流程图</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .section {
+            padding: 40px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #667eea;
+            margin-bottom: 30px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .diagram-container {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            overflow-x: auto;
+        }
+
+        .diagram-title {
+            font-size: 1.3em;
+            color: #333;
+            margin-bottom: 20px;
+            padding-left: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .nav {
+            background: #f8f9fa;
+            padding: 20px 40px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .nav ul {
+            list-style: none;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .nav a:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+
+        .info-box h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table th,
+        table td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid #e0e0e0;
+        }
+
+        table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin: 20px 0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .section {
+                padding: 20px;
+            }
+
+            .nav ul {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 SDK特征工程流程图</h1>
+            <p>从原始JSON到聚类就绪特征矩阵的完整数据处理流程</p>
+        </div>
+
+        <div class="nav">
+            <ul>
+                <li><a href="#main-flow">主流程</a></li>
+                <li><a href="#method-relations">方法关系</a></li>
+                <li><a href="#data-flow">数据流转</a></li>
+                <li><a href="#tfidf">TF-IDF</a></li>
+                <li><a href="#tlsh">TLSH处理</a></li>
+                <li><a href="#fusion">特征融合</a></li>
+                <li><a href="#pca">标准化与PCA</a></li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <div class="info-box">
+                <h3>📌 概述</h3>
+                <p>特征工程模块将SDK的原始数据（导入导出序列、操作码序列、TLSH哈希）转换为可用于聚类的数值特征矩阵。整个过程包括数据加载、特征提取、特征融合、标准化和可选的PCA降维。</p>
+            </div>
+        </div>
+
+        <div class="section" id="main-flow">
+            <div class="section-title">🎯 完整流程图</div>
+            <div class="diagram-container">
+                <div class="diagram-title">数据处理主流程</div>
+                <pre class="mermaid">
+graph TD
+    Start([开始]) --> LoadData[加载数据<br/>load_data]
+    
+    LoadData --> CheckFormat{文件格式?}
+    
+    CheckFormat -->|JSONL| ReadJSONL[逐行读取<br/>json.loads]
+    CheckFormat -->|JSON数组| ReadArray[解析数组<br/>json.loads]
+    CheckFormat -->|单个JSON| ReadSingle[解析单个对象<br/>json.loads]
+    CheckFormat -->|其他| Error1[抛出异常<br/>ValueError]
+    
+    ReadJSONL --> ValidateData
+    ReadArray --> ValidateData
+    ReadSingle --> ValidateData
+    
+    ValidateData[验证数据<br/>_validate_data]
+    ValidateData --> CheckFields{字段完整?}
+    CheckFields -->|否| Skip1[跳过样本]
+    CheckFields -->|是| CheckHashes{哈希非空?}
+    CheckHashes -->|否| Skip1
+    CheckHashes -->|是| StoreData[存储有效数据]
+    
+    Skip1 --> NextSample{还有样本?}
+    NextSample -->|是| ValidateData
+    NextSample -->|否| ExtractAll[提取所有特征<br/>extract_all_features]
+    
+    StoreData --> NextSample
+    
+    ExtractAll --> ExtractImport[导入导出特征]
+    ExtractAll --> ExtractOpcode[操作码特征]
+    ExtractAll --> ExtractTLSH[TLSH特征]
+    
+    ExtractImport --> PrepImport[准备语料库<br/>prepare_text_corpus]
+    PrepImport --> TokenizeImport[分词处理<br/>tokenize_sequence]
+    TokenizeImport --> FitImport[训练TF-IDF<br/>fit_tfidf_vectorizer]
+    FitImport --> TransformImport[转换特征<br/>transform_tfidf]
+    
+    ExtractOpcode --> PrepOpcode[准备语料库]
+    PrepOpcode --> TokenizeOpcode[分词处理]
+    TokenizeOpcode --> FitOpcode[训练TF-IDF]
+    FitOpcode --> TransformOpcode[转换特征]
+    
+    ExtractTLSH --> ParseTLSH[解析TLSH哈希<br/>extract_tls_features]
+    ParseTLSH --> HexToBytes[十六进制转字节<br/>bytes.fromhex]
+    HexToBytes --> SplitBytes[字节拆分4位<br/>高4位/低4位]
+    SplitBytes --> Vector70[生成70维向量]
+    
+    TransformImport --> FuseFeatures[融合特征<br/>fuse_features]
+    TransformOpcode --> FuseFeatures
+    Vector70 --> FuseFeatures
+    
+    FuseFeatures --> Normalize[归一化<br/>MinMaxScaler]
+    Normalize --> ApplyWeight[应用权重<br/>import:0.3<br/>opcode:0.4<br/>tls:0.3]
+    ApplyWeight --> Concatenate[拼接特征<br/>np.hstack]
+    
+    Concatenate --> Scale[标准化<br/>apply_scaling]
+    Scale --> CheckScaler{标准化方式?}
+    CheckScaler -->|standard| StandardScaler[Z-score标准化]
+    CheckScaler -->|minmax| MinMaxScaler[Min-Max归一化]
+    CheckScaler -->|其他| SkipScale[跳过标准化]
+    
+    StandardScaler --> CheckPCA
+    MinMaxScaler --> CheckPCA
+    SkipScale --> CheckPCA
+    
+    CheckPCA{配置PCA?}
+    CheckPCA -->|是| ApplyPCA[PCA降维<br/>apply_pca]
+    CheckPCA -->|否| FinalMatrix[最终特征矩阵]
+    
+    ApplyPCA --> FinalMatrix
+    
+    FinalMatrix --> SaveData[保存数据<br/>save_processed_data]
+    SaveData --> WriteJSON[写入JSON文件]
+    WriteJSON --> GenerateReport[生成报告<br/>generate_report]
+    GenerateReport --> Statistics[统计信息<br/>样本数/特征覆盖率]
+    Statistics --> End([结束])
+    
+    Error1 --> End
+    
+    style Start fill:#90EE90
+    style End fill:#FFB6C1
+    style FinalMatrix fill:#87CEEB
+    style FuseFeatures fill:#DDA0DD
+    style ExtractImport fill:#FFD700
+    style ExtractOpcode fill:#FFA500
+    style ExtractTLSH fill:#FF6347
+                </pre>
+            </div>
+        </div>
+
+        <div class="section" id="method-relations">
+            <div class="section-title">🔗 类方法调用关系</div>
+            <div class="diagram-container">
+                <div class="diagram-title">SDKFeatureEngineer 类方法关系</div>
+                <pre class="mermaid">
+graph LR
+    subgraph "SDKFeatureEngineer 类"
+        Init[__init__]
+        LD[load_data]
+        VD[_validate_data]
+        DST[_detect_sequence_type]
+        EPS[extract_features_per_sample]
+        TS[tokenize_sequence]
+        PTC[prepare_text_corpus]
+        FTV[fit_tfidf_vectorizer]
+        TT[transform_tfidf]
+        CTHD[compute_tls_hamming_distance]
+        EAF[extract_all_features]
+        ETF[extract_tls_features]
+        FF[fuse_features]
+        AS[apply_scaling]
+        AP[apply_pca]
+        PROC[process]
+        GSI[get_sample_info]
+        SPD[save_processed_data]
+        LPD[load_processed_data]
+        GR[generate_report]
+    end
+    
+    Init --> LD
+    LD --> VD
+    VD --> DST
+    DST --> EPS
+    EPS --> TS
+    EPS --> PTC
+    PTC --> TS
+    PTC --> FTV
+    FTV --> TT
+    EPS --> CTHD
+    EPS --> ETF
+    ETF --> EAF
+    EAF --> FF
+    FF --> AS
+    AS --> AP
+    PROC --> LD
+    PROC --> EAF
+    PROC --> FF
+    PROC --> AS
+    PROC --> AP
+    PROC --> SPD
+    PROC --> GR
+    GSI --> EPS
+    LPD --> Init
+                </pre>
+            </div>
+        </div>
+
+        <div class="section" id="data-flow">
+            <div class="section-title">📊 数据处理流程详解</div>
+            <div class="diagram-container">
+                <div class="diagram-title">四阶段数据处理</div>
+                <pre class="mermaid">
+graph TD
+    subgraph "阶段1: 数据加载"
+        JSON[原始JSON数据]
+        JSON --> Parse[解析JSON]
+        Parse --> Filter[过滤无效数据]
+        Filter --> Samples[有效样本列表]
+    end
+    
+    subgraph "阶段2: 特征提取"
+        Samples --> Split{序列分类}
+        
+        Split -->|导入导出| ImportSeq[导入导出序列]
+        Split -->|操作码| OpcodeSeq[操作码序列]
+        Split -->|TLSH| TLSHSeq[TLSH哈希]
+        
+        ImportSeq --> ImportToken[分词]
+        ImportToken --> ImportTFIDF[TF-IDF向量化]
+        ImportTFIDF --> ImportVec[导入导出特征向量]
+        
+        OpcodeSeq --> OpcodeToken[分词]
+        OpcodeToken --> OpcodeNGram[N-gram处理]
+        OpcodeNGram --> OpcodeTFIDF[TF-IDF向量化]
+        OpcodeTFIDF --> OpcodeVec[操作码特征向量]
+        
+        TLSHSeq --> TLSHParse[解析十六进制]
+        TLSHParse --> TLSHConvert[转换为数值]
+        TLSHConvert --> TLSHVec[TLSH特征向量]
+    end
+    
+    subgraph "阶段3: 特征融合"
+        ImportVec --> Normalize1[归一化]
+        OpcodeVec --> Normalize2[归一化]
+        TLSHVec --> Normalize3[归一化]
+        
+        Normalize1 --> Weight1[×0.3权重]
+        Normalize2 --> Weight2[×0.4权重]
+        Normalize3 --> Weight3[×0.3权重]
+        
+        Weight1 --> Concat[特征拼接]
+        Weight2 --> Concat
+        Weight3 --> Concat
+    end
+    
+    subgraph "阶段4: 后处理"
+        Concat --> Standardize[标准化]
+        Standardize --> PCA{降维?}
+        PCA -->|是| PCATransform[PCA变换]
+        PCA -->|否| Output[最终特征矩阵]
+        PCATransform --> Output
+    end
+    
+    Output --> Save[保存JSON]
+                </pre>
+            </div>
+        </div>
+
+        <div class="section" id="tfidf">
+            <div class="section-title">📝 TF-IDF向量化流程</div>
+            <div class="diagram-container">
+                <div class="diagram-title">TF-IDF处理步骤</div>
+                <pre class="mermaid">
+graph TD
+    Corpus[语料库] --> Tokenize{分词}
+    
+    Tokenize --> TokenList[词列表]
+    TokenList --> CountVocab[统计词频]
+    CountVocab --> FilterVocab{过滤词汇}
+    
+    FilterVocab -->|min_df| FilterMin[最小文档频率]
+    FilterVocab -->|max_df| FilterMax[最大文档频率]
+    FilterVocab -->|max_features| FilterTop[保留top N]
+    
+    FilterMin --> Vocab[最终词汇表]
+    FilterMax --> Vocab
+    FilterTop --> Vocab
+    
+    Vocab --> ComputeTF[计算TF]
+    Vocab --> ComputeIDF[计算IDF]
+    
+    ComputeTF --> TFIDF[TF × IDF]
+    ComputeIDF --> TFIDF
+    
+    TFIDF --> NormalizeTFIDF[归一化]
+    NormalizeTFIDF --> SparseMatrix[稀疏矩阵]
+    SparseMatrix --> DenseMatrix[密集矩阵]
+                </pre>
+            </div>
+            
+            <div class="info-box">
+                <h3>💡 TF-IDF 原理</h3>
+                <p><strong>TF (Term Frequency)</strong>: 词在文档中的频率，衡量词在单个文档中的重要性</p>
+                <p><strong>IDF (Inverse Document Frequency)</strong>: 词在整个语料库中的稀有程度，衡量词的区分能力</p>
+                <p><strong>TF-IDF = TF × IDF</strong>: 综合衡量词的重要性</p>
+            </div>
+        </div>
+
+        <div class="section" id="tlsh">
+            <div class="section-title">🔐 TLSH哈希处理流程</div>
+            <div class="diagram-container">
+                <div class="diagram-title">TLSH解析步骤</div>
+                <pre class="mermaid">
+graph TD
+    Hash[TLSH哈希字符串] --> CheckFormat{格式检查}
+    
+    CheckFormat -->|不是TLSH| Skip[跳过]
+    CheckFormat -->|是TLSH| RemovePrefix[去掉'T1'前缀]
+    
+    RemovePrefix --> HexStr[十六进制字符串]
+    HexStr --> ToBytes[转为字节]
+    
+    ToBytes --> ByteLoop{遍历字节}
+    ByteLoop --> GetByte[获取字节值]
+    GetByte --> High4[(高4位 >> 4 & 0xF)]
+    GetByte --> Low4[(低4位 & 0xF)]
+    
+    High4 --> Vector70[70维向量]
+    Low4 --> Vector70
+    
+    Vector70 --> CheckCount{有多个哈希?}
+    CheckCount -->|是| Average[求平均值]
+    CheckCount -->|否| Keep[保持原值]
+    
+    Average --> Output[TLSH特征向量]
+    Keep --> Output
+                </pre>
+            </div>
+
+            <div class="info-box">
+                <h3>🔍 TLSH哈希解析示例</h3>
+                <div class="code-block">
+输入: "T1A521981D0779E0E..."
+
+1. 去掉"T1"前缀: "A521981D0779E0E..."
+2. 转为字节: [0xA5, 0x21, 0x98, 0x1D, 0x07, 0x79, ...]
+3. 拆分为4位:
+   字节0xA5 → [10, 5]  → [0xA, 0x5]
+   字节0x21 → [2, 1]   → [0x2, 0x1]
+   字节0x98 → [9, 8]   → [0x9, 0x8]
+   ...
+4. 输出70维向量: [10, 5, 2, 1, 9, 8, ...]
+                </div>
+            </div>
+        </div>
+
+        <div class="section" id="fusion">
+            <div class="section-title">🔗 特征融合流程</div>
+            <div class="diagram-container">
+                <div class="diagram-title">三特征加权融合</div>
+                <pre class="mermaid">
+graph LR
+    subgraph "输入特征"
+        I1[导入导出<br/>n×4]
+        I2[操作码<br/>n×192]
+        I3[TLSH<br/>n×70]
+    end
+    
+    subgraph "归一化"
+        N1[MinMaxScaler<br/>[0,1]]
+        N2[MinMaxScaler<br/>[0,1]]
+        N3[MinMaxScaler<br/>[0,1]]
+    end
+    
+    subgraph "加权"
+        W1[×0.3]
+        W2[×0.4]
+        W3[×0.3]
+    end
+    
+    subgraph "拼接"
+        C[特征矩阵<br/>n×266]
+    end
+    
+    I1 --> N1 --> W1
+    I2 --> N2 --> W2
+    I3 --> N3 --> W3
+    
+    W1 --> C
+    W2 --> C
+    W3 --> C
+                </pre>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>特征类型</th>
+                        <th>原始维度</th>
+                        <th>权重</th>
+                        <th>加权后贡献</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>导入导出</td>
+                        <td>4</td>
+                        <td>30%</td>
+                        <td>反映SDK依赖关系和接口特征</td>
+                    </tr>
+                    <tr>
+                        <td>操作码</td>
+                        <td>192</td>
+                        <td>40%</td>
+                        <td>反映代码执行逻辑和模式（最重要）</td>
+                    </tr>
+                    <tr>
+                        <td>TLSH</td>
+                        <td>70</td>
+                        <td>30%</td>
+                        <td>检测代码相似性，容忍轻微改动</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section" id="pca">
+            <div class="section-title">📏 标准化与PCA流程</div>
+            <div class="diagram-container">
+                <div class="diagram-title">后处理步骤</div>
+                <pre class="mermaid">
+graph TD
+    Fused[融合特征<br/>n×266] --> ScaleMethod{标准化方式?}
+    
+    ScaleMethod -->|StandardScaler| Standard[(x-μ)/σ]
+    ScaleMethod -->|MinMaxScaler| MinMax[(x-min)/(max-min)]
+    ScaleMethod -->|无| Bypass[保持原值]
+    
+    Standard --> Scaled[标准化特征]
+    MinMax --> Scaled
+    Bypass --> Scaled
+    
+    Scaled --> CheckPCA{配置PCA?}
+    
+    CheckPCA -->|否| Final[最终特征<br/>n×266]
+    CheckPCA -->|是| FitPCA[训练PCA]
+    
+    FitPCA --> TransformPCA[变换特征]
+    TransformPCA --> Reduced[降维特征<br/>n×k]
+    
+    Reduced --> Final
+                </pre>
+            </div>
+
+            <div class="info-box">
+                <h3>⚙️ 标准化方式对比</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>方法</th>
+                            <th>公式</th>
+                            <th>输出范围</th>
+                            <th>特点</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>StandardScaler</td>
+                            <td>(x - μ) / σ</td>
+                            <td>~N(0,1)</td>
+                            <td>适合正态分布数据，去除量纲影响</td>
+                        </tr>
+                        <tr>
+                            <td>MinMaxScaler</td>
+                            <td>(x - min) / (max - min)</td>
+                            <td>[0,1]</td>
+                            <td>保留原始分布，压缩异常值影响</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📋 输出文件结构</div>
+            <div class="diagram-container">
+                <div class="diagram-title">processed_features.json 结构</div>
+                <div class="code-block">
+{
+  "feature_matrix": [[0.1, 0.2, 0.3, ...], ...],
+  "sample_info": [
+    {
+      "coordinateName": "@abner/log",
+      "version": "1.0.3",
+      "import_export_count": 1,
+      "opcode_count": 15,
+      "tlsh_count": 1,
+      "total_sequences": 17
+    }
+  ],
+  "config": {
+    "max_features": 2000,
+    "ngram_range": [1, 2],
+    "min_df": 2,
+    "max_df": 0.95,
+    "pca_components": null,
+    "scaler": "standard",
+    "tlsh_weight": 0.3,
+    "opcode_weight": 0.4,
+    "import_weight": 0.3
+  },
+  "feature_shapes": {
+    "import_export": 4,
+    "opcode": 192,
+    "tlsh": 70
+  }
+}
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🚀 快速开始</div>
+            <div class="info-box">
+                <h3>使用流程</h3>
+                <ol style="margin-left: 20px; line-height: 2;">
+                    <li>将JSON数据放到 <code>data/raw/samples.json</code></li>
+                    <li>运行特征工程: <code>python src/feature_engineer.py</code></li>
+                    <li>查看处理结果: <code>data/processed/processed_features.json</code></li>
+                    <li>使用特征矩阵进行聚类分析</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+        });
+    </script>
+</body>
+</html>
