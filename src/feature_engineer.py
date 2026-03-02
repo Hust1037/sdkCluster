@@ -385,7 +385,8 @@ class SDKFeatureEngineer:
 def main():
     engineer = SDKFeatureEngineer()
     
-    data_path = '/Users/chengqihan/AICode/sdk_clustering/data/raw/samples.json'
+    # 直接硬编码为包含7000多个JSON文件的目录路径
+    data_path = '/Users/chengqihan/AICode/sdk_clustering/data/raw'
     output_path = '/Users/chengqihan/AICode/sdk_clustering/data/processed/processed_features.json'
     
     try:
@@ -400,12 +401,11 @@ def main():
         print(json.dumps(report, indent=2, ensure_ascii=False))
         
     except FileNotFoundError:
-        print(f"\n数据文件未找到: {data_path}")
+        print(f"\n数据目录未找到: {data_path}")
         print(f"请将你的JSON数据文件放到: {data_path}")
         print(f"支持的格式:")
-        print(f"  - 单个JSON对象")
-        print(f"  - JSON数组 [{ {...}, {...} }]")
-        print(f"  - JSONL (每行一个JSON对象)")
+        print(f"  - 单个JSON文件")
+        print(f"  - 目录中的多个JSON文件")
     except Exception as e:
         print(f"\n处理数据时出错: {e}")
         import traceback
