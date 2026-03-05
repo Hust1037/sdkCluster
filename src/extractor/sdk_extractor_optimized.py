@@ -116,45 +116,102 @@ class SDKFeatureExtractorOptimized:
         s = sequence.strip()
         if not s: return 'unknown'
 
-        if s.startswith('T1') and len(s) == 70 and all(c in '0123456789ABCDEF' for c in s[2:]):
+        # 1. TLSH检测（支持70-72字符长度）
+        if s.startswith('T1') and 70 <= len(s) <= 72 and all(c in '0123456789ABCDEF' for c in s[2:]):
             return 'tlsh'
 
         tokens = s.split()
         if not tokens: return 'unknown'
 
+        # 2. 业务语义检测（优先级最高）
+        business_semantic_indicators = 0
+
+        # 2.1 函数调用模式 _get[A-Z], _set[A-Z]
+        if re.search(r'_[gs]et[A-Z][a-zA-Z]*', s):
+            business_semantic_indicators += 2
+
+        # 2.2 事件监听模式 mOn[A-Z]
+        if re.search(r'mOn[A-Z][a-zA-Z]+', s):
+            business_semantic_indicators += 2
+
+        # 2.3 业务关键词
+        business_keywords = ['PROP_', 'FFP_', 'Listener', 'Handler']
+        if any(keyword in s for keyword in business_keywords):
+            business_semantic_indicators += 2
+
+        # 2.4 特殊业务函数
+        business_functions = ['definefieldbyname', 'createobjectwithbuffer', 'getInstance']
+        if any(func in s for func in business_functions):
+            business_semantic_indicators += 2
+
+        # 2.5 包含版本号的类型引用
+        if re.search(r'[A-Z][a-zA-Z]+&[0-9]+\.[0-9]+', s):
+            business_semantic_indicators += 1
+
+        # 如果业务语义指示器>=2，判定为业务语义
+        if business_semantic_indicators >= 2:
+            return 'business_semantic'
+
+        # 3. 导入导出检测（支持多种格式）
+        import_export_indicators = 0
+
+        # 3.1 标准@:格式
+        if '@:' in s:
+            import_export_indicators += 3
+
+        # 3.2 归一化声明 @normalized
+        if '@normalized' in s:
+            import_export_indicators += 2
+
+        # 3.3 路径引用 @/path/to/file
+        if re.search(r'@/[a-zA-Z0-9_./-]+', s):
+            import_export_indicators += 2
+
+        # 3.4 库文件引用 libname.so
+        if re.search(r'[a-zA-Z0-9_]+\.so', s):
+            import_export_indicators += 2
+
+        # 3.5 其他导入导出关键词
+        import_keywords = ['import', 'export', 'require', 'declare', '.webview', 'router']
+        if any(keyword in s.lower() for keyword in import_keywords):
+            import_export_indicators += 2
+
+        # 3.6 特殊分隔符 &&& (连接多个导入导出)
+        if '&&&' in s:
+            import_export_indicators += 2
+
+        # 3.7 包含版本号 &版本格式
+        if re.search(r'&[0-9]+\.[0-9]+', s):
+            import_export_indicators += 1
+
+        # 如果导入导出指示器>=2，判定为导入导出
+        if import_export_indicators >= 2:
+            return 'import_export'
+
+        # 4. 数字序列检测
         if all(token.isdigit() for token in tokens):
             return 'numeric'
 
-        IMPORT_PATTERNS = ['@:', '.webview', 'router', 'ObservedProperty', 'import', 'export', 'require', 'declare']
-        if any(p in s for p in IMPORT_PATTERNS):
-            return 'import_export'
-
-        leading_tokens = tokens[:3]
-        if any(token and token[0].isupper() and len(token) > 2 for token in leading_tokens):
-            return 'import_export'
-
-        ARK_OPCODE_ROOTS = {
+        # 5. 操作码检测
+        ARK_OPCODE_KEYWORDS = {
             'lda', 'sta', 'ldai', 'ldglobal', 'stglobal', 'ldobj', 'stobj',
-            'ldlexvar', 'stlexvar', 'newlexenv', 'poplexenv', 'ldlocalmodulevar',
-            'callarg', 'callthis', 'supercall', 'newobj', 'return',
-            'add2', 'sub2', 'mul2', 'div2', 'mod2', 'shl2', 'shr2', 'ashr2', 'and2', 'or2', 'xor2',
-            'stricteq', 'strictnoteq', 'throw', 'tryldglobal'
+            'ldlexvar', 'stlexvar', 'newlexenv', 'poplexenv',
+            'callthis', 'returnundefined', 'istrue', 'ldfalse', 'isfalse',
+            'add2', 'sub2', 'mul2', 'div2', 'mod2', 'shl2', 'shr2', 'ashr2',
+            'and2', 'or2', 'xor2', 'stricteq', 'strictnoteq',
+            'throw', 'tryldglobal', 'nop', 'copyrestargs'
         }
 
-        is_opcode = False
-        for token in tokens[:10]:
-            if any(token.lower().startswith(root) for root in ARK_OPCODE_ROOTS):
-                is_opcode = True
-                break
+        opcode_count = 0
+        for token in tokens:
+            if any(token.lower().startswith(keyword) for keyword in ARK_OPCODE_KEYWORDS):
+                opcode_count += 1
+            if opcode_count >= 3:  # 包含3个以上操作码
+                return 'opcode'
 
-        if not is_opcode and all(t.islower() and t.isalnum() and len(t) <= 15 for t in tokens[:5]):
-            is_opcode = True
-
-        if is_opcode:
+        # 6. 兜底：如果包含小写字母为主的token，判定为操作码
+        if all(t.islower() and t.isalnum() and len(t) <= 15 for t in tokens[:5]):
             return 'opcode'
-
-        if any(c.isalpha() for c in s):
-            return 'business_semantic'
 
         return 'unknown'
 
@@ -167,7 +224,8 @@ class SDKFeatureExtractorOptimized:
             'semantic_sequences': [],
             'opcode_sequences': [],
             'tlsh_hashes': [],
-            'numeric_sequences': []
+            'numeric_sequences': [],
+            'unknown_sequences': []  # 新增：记录无法识别的序列
         }
         for seq in hashes:
             seq_type = self._detect_sequence_type(seq)
@@ -181,6 +239,8 @@ class SDKFeatureExtractorOptimized:
                 features['tlsh_hashes'].append(seq)
             elif seq_type == 'numeric':
                 features['numeric_sequences'].append(seq)
+            else:
+                features['unknown_sequences'].append(seq)
         return features
 
     def tokenize_sequence(self, sequence: str) -> List[str]:
@@ -509,3 +569,47 @@ class SDKFeatureExtractorOptimized:
 
         importance = {name: var for name, var in zip(feature_names, variances)}
         return dict(sorted(importance.items(), key=lambda x: x[1], reverse=True))
+
+    def save_unknown_sequences(self, output_path: str = 'unknown_sequences.json'):
+        """
+        保存无法识别的unknown序列到JSON文件
+        用于后续分析和优化序列检测逻辑
+        """
+        unknown_data = []
+
+        for sample in self.data:
+            extracted = self.extract_features_per_sample(sample)
+            unknown_seqs = extracted.get('unknown_sequences', [])
+
+            if unknown_seqs:
+                unknown_data.append({
+                    'coordinateName': extracted['coordinateName'],
+                    'version': extracted['version'],
+                    'unknown_count': len(unknown_seqs),
+                    'unknown_sequences': unknown_seqs,
+                    'total_sequences': len(sample['codeTlshHashes'])
+                })
+
+        # 统计信息
+        total_unknown = sum(item['unknown_count'] for item in unknown_data)
+        total_samples = len(unknown_data)
+
+        output = {
+            'summary': {
+                'total_samples_with_unknown': total_samples,
+                'total_unknown_sequences': total_unknown,
+                'unknown_rate': f"{total_unknown / total_samples * 100:.1f}%" if total_samples > 0 else "0%"
+            },
+            'unknown_data': unknown_data
+        }
+
+        # 保存到文件
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(output, f, indent=2, ensure_ascii=False)
+            print(f"已保存unknown序列到文件: {output_path}")
+            print(f"  - 总样本数: {total_samples}")
+            print(f"  - Unknown序列总数: {total_unknown}")
+            print(f"  - Unknown比例: {output['summary']['unknown_rate']}")
+        except Exception as e:
+            print(f"保存unknown序列失败: {e}")
