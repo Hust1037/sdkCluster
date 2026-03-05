@@ -181,19 +181,39 @@ class SDKFeatureExtractor:
             'callthis', 'returnundefined', 'istrue', 'ldfalse', 'isfalse',
             'add2', 'sub2', 'mul2', 'div2', 'mod2', 'shl2', 'shr2', 'ashr2',
             'and2', 'or2', 'xor2', 'stricteq', 'strictnoteq',
-            'throw', 'tryldglobal', 'nop', 'copyrestargs'
+            'throw', 'tryldglobal', 'nop', 'copyrestargs',
+            # 新增：更多操作码关键词
+            'newobjrange', 'defineclasswithbuffer', 'definemethod',
+            'ldhole', 'stmodulevar', 'callthis0', 'callthis1', 'callthis2', 'callthis3',
+            'createobjectwithbuffer', 'definefieldbyname', 'getInstance'
         }
 
         opcode_count = 0
         for token in tokens:
-            if any(token.lower().startswith(keyword) for keyword in ARK_OPCODE_KEYWORDS):
+            token_lower = token.lower()
+            if any(token_lower.startswith(keyword) for keyword in ARK_OPCODE_KEYWORDS):
                 opcode_count += 1
-            if opcode_count >= 3:  # 包含3个以上操作码
-                return 'opcode'
 
-        # 6. 兜底：如果包含小写字母为主的token，判定为操作码
+        # 降低阈值：只要有操作码就判定为操作码序列
+        # 因为操作码序列通常混合了操作码和变量名/属性名
+        if opcode_count >= 1:
+            return 'opcode'
+
+        # 6. 兜底规则
+        # 6.1 如果包含小写字母为主的token，判定为操作码
         if all(t.islower() and t.isalnum() and len(t) <= 15 for t in tokens[:5]):
             return 'opcode'
+
+        # 6.2 属性访问模式（如 mVideoWidth, mLogOpen）
+        # 这类序列通常是操作码上下文中的变量/属性名
+        if len(tokens) == 1:
+            token = tokens[0]
+            # 检查是否是属性访问模式：m前缀 + 大写字母开头
+            if re.match(r'^m[A-Z][a-zA-Z0-9_]*$', token):
+                return 'opcode'
+            # 检查是否是下划线开头的私有属性
+            if re.match(r'^_[a-zA-Z_][a-zA-Z0-9_]*$', token):
+                return 'opcode'
 
         return 'unknown'
 
